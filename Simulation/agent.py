@@ -42,7 +42,7 @@ def is_edu_math(e1, e2):
     return False
 
 
-# 绘图，展示agent的满意度折线图.
+# Drawing, showing the satisfaction line chart of the agent.
 def plot_agent(agent):
     idperfix = "pid"
     title = "Person"
@@ -79,7 +79,7 @@ def plot_area(area, type="person"):
     print("here....")
     id_to_satisfaction = dict()
     if type == "person":
-        for p in area.people.values():  # 新增的人记录数组长度不确定，无法绘图，记录丢弃
+        for p in area.people.values():
             if len(p.satisfaction_list) == area.round_num:
                 id_to_satisfaction[p.unique_id] = p.satisfaction
     elif type == "firm":
@@ -108,12 +108,12 @@ def plot_area(area, type="person"):
 class House():
     def __init__(self, id):
         self.unique_id = id
-        self.firm = None  # 最开始属于哪个公司，这个值可以给变
-        self.owner = None  # 属于哪个人，要么firm为None，要么owner为None
-        self.area = None  # 属于哪个区域，不可更改
-        self.flag_of_buy = True  # 是否可买
-        self.cost = 0  # 成本
-        self.price = 0  # 售价
+        self.firm = None  # belongs to which firm？
+        self.owner = None  # belongs to which citizen？
+        self.area = None  # belongs to which ward，immutable
+        self.flag_of_buy = True  #
+        self.cost = 0  # cost
+        self.price = 0  # price
         self.xpoint = 0
         self.ypoint = 0
 
@@ -121,10 +121,10 @@ class House():
 class Job():
     def __init__(self):
         self.unique_id = 0
-        self.area = None  # 对于一份工作来说，地区和所属公司都不能改变
+        self.area = None  # immutable
         self.firm = None
-        self.edu = None  # 教育要求
-        self.wage = 0  # 工资
+        self.edu = None  # education requirement
+        self.wage = 0  # wage
 
 
 class Person(Agent):
@@ -149,8 +149,8 @@ class Person(Agent):
 
         self.flag_of_new_person = True
 
-        self.firm = None  # 属于哪个公司，可能会变化。当自己是老板时，这个公司就归自己所有
-        self.area = None  # 属于哪个地区，也可能会变化
+        self.firm = None  # belongs to which firm
+        self.area = None  # belongs to which ward
 
         self.round_num = 0
         self.satisfaction_list = []
@@ -159,7 +159,7 @@ class Person(Agent):
     def consume(self):
         hloss = random.uniform(0.1, 0.15)
         if self.health < 1:
-            unitcost = random.randint(8, 45)  # 每0.1hp需要消耗的money
+            unitcost = random.randint(8, 45)  # each 0.1hp needs to consume money
             cost = unitcost * hloss * 10
             try:
                 firm = self.area.get_one_firm()
@@ -168,7 +168,7 @@ class Person(Agent):
                         firm.wealth += cost
                     else:
                         firm.wealth += cost * (1.0 - configs.BUSINESS_TAX_RATE)
-                        self.area.gain_wealth(cost * configs.BUSINESS_TAX_RATE)  # 交税
+                        self.area.gain_wealth(cost * configs.BUSINESS_TAX_RATE)  # Pay taxes
                     self.wealth -= cost
             except:
                 return
@@ -192,7 +192,7 @@ class Person(Agent):
             if h.price > self.wealth:
                 continue
             distance = get_distance(self.xpoint, self.ypoint, h.xpoint, h.ypoint)
-            if distance < best_distance:  # 买自己最近的房产
+            if distance < 15000:  # choose closest property
                 best_distance = distance
                 best_house = h
 
@@ -207,7 +207,7 @@ class Person(Agent):
             self.house_state = HouseState.Yes
             self.xpoint = best_house.xpoint
             self.ypoint = best_house.ypoint
-            if self.area != best_house.area:  # 买房引起了迁移
+            if self.area != best_house.area:  # migrate by buying house
                 self.area.pid_to_income.pop(self.unique_id)
                 self.area.people.pop(self.unique_id)
                 best_house.area.pid_to_income[self.unique_id] = self.earning
@@ -239,7 +239,7 @@ class Person(Agent):
         # Step 1
         if self.job_state == JobState.Unemployment \
                 and self.wealth >= self.model.firm_wealth_level \
-                and self.round_num >= configs.THRESHOLD_TO_CREATE_FIRM:  # 创建公司
+                and self.round_num >= configs.THRESHOLD_TO_CREATE_FIRM:  # run a business
             firm = Firm(fid=self.model.next_id(),
                         model=self.model,
                         xpoint=self.xpoint,
@@ -251,7 +251,7 @@ class Person(Agent):
             self.job_state = JobState.OwnFirm
             self.area.firms[firm.unique_id] = firm
             self.model.firm_wealth_record[firm.unique_id] = firm.wealth
-            self.model.schedule.add(firm)  # 参与调度但是不放在grid上
+            self.model.schedule.add(firm)
             # print("add firm, pid:%d, fid:%d" % (self.unique_id, self.firm.unique_id))
             assert self.firm
 
@@ -261,7 +261,7 @@ class Person(Agent):
         if self.job_state == JobState.Employment:
             self.wealth += (self.earning / 30)
         elif self.job_state == JobState.OwnFirm:
-            # TODO 资产+ （每天公司获得的财富-发放工资的部分）* 5%,设定税率
+            # TODO += assets
             # assert self.firm
             if not self.firm:
                 print("pid:%d, gain money" % (self.unique_id))
@@ -270,7 +270,7 @@ class Person(Agent):
             self.area.gain_wealth(nw * configs.INCOME_TAX_RATE)
             pass
 
-        # 消费
+        # consume
         self.consume()
 
         # step 4 die
@@ -285,14 +285,14 @@ class Person(Agent):
                 self.firm.employees.pop(self.unique_id)
             return
 
-        # step 5 迁移. 如果自给工作还是不要迁移了，买房是早晚的事儿。
+        # step 5 migrate
         if self.house_state == HouseState.No and self.job_state != JobState.OwnFirm:
             low10_percent_income = self.area.get_npencent_income(top_flag=False, n=10)
             top10_percent_income = self.area.get_npencent_income(top_flag=True, n=10)
             if self.earning <= low10_percent_income or self.earning >= top10_percent_income:
                 destination = None
                 for a in list(self.model.aid_to_area.values()):
-                    if a == self.area:  # 一定要走，当前area不考虑
+                    if a == self.area:  # move out
                         continue
                     if not destination:
                         destination = a
@@ -311,11 +311,11 @@ class Person(Agent):
                         self.satisfaction -= 3.0
                     else:
                         self.satisfaction += 3.0
-                # 换工作
+                # change job
                 if self.firm != None:
                     distance = math.sqrt((self.xpoint - self.firm.xpoint) * (self.xpoint - self.firm.xpoint) + (
                             self.ypoint - self.firm.ypoint) * (self.ypoint - self.firm.ypoint))
-                    if distance >= configs.DISTANCE_TRIGGER_TO_CHANGE_JOB:  # 现在有工作且距离大于15km
+                    if distance >= configs.DISTANCE_TRIGGER_TO_CHANGE_JOB:
                         self.firm.employees.pop(self.unique_id)
                         self.job_state = JobState.Unemployment
                         self.firm = None
@@ -340,9 +340,8 @@ class Person(Agent):
                             comfort=None)
             self.area.people[person.unique_id] = person
             person.area = self.area
-            self.model.schedule.add(person)  # 参与调度但是不放在grid上
+            self.model.schedule.add(person)
         # print("pid:%d, after step job_state:%d .." % (self.unique_id, self.firm != None))
-        # TOOD 更新舒适度
         self.collect_data()
         pass
 
@@ -358,8 +357,8 @@ class Person(Agent):
 
 
 class Area(Agent):
-    # 地区包含m个firm，n个person
-    # 先初始化为area，再根据area初始化firm和person，person根据规则可以判断是否在某个firm上班或者拥有某个firm
+    # Initialize to area, then initialize the firm and person according to the area,
+    # the person can judge whether to work at a certain firm or have a certain firm according to the rules.
     def __init__(self, model, aid,
                  code=None, name=None, population=None,
                  high_edu=0, middle_edu=0, low_edu=0,
@@ -384,42 +383,42 @@ class Area(Agent):
         self.xpoint = xpoint
         self.ypoint = ypoint
         self.satisfaction = satisfaction
-        self.cscore = 0  # 用于归一化时存储得分
+        self.cscore = 0  # store normalized score
         self.comfort = comfort
         self.wealth = wealth
         self.house_rate = house_rate
         self.rent_rate = rent_rate
         self.firm_num = firm_num
 
-        self.total_space = 0  # 总用地面积
-        self.free_space = 0  # 可用面积
+        self.total_space = 0  # total area
+        self.free_space = 0  # usable area
         self.house_space = 0
         self.green_space = 0
         self.building_space = 0
 
-        self.tax_free_flag = False  # 免除消费税标志
+        self.tax_free_flag = False  # Exemption from consumption tax flag
 
-        self.firms = dict()  # 每个区域维护自己的所有公司列表，key是firm的uniq id，value是object
-        self.people = dict()  # 每个区域维护自己的所有人口列表key是perople的唯一id，value是object
-        self.pid_to_income = dict()  # people id查找收入，用于获取后百分之五
+        self.firms = dict()  # key is firm uniq id，value is object in each ward
+        self.people = dict()  # key is people unique id，value is object in each ward
+        self.pid_to_income = dict()  # people id filt income ，get low 5 percentile
 
-        self.low5_percent_income = []  # 区域的后5%收入
-        self.low10_percent_income = []  # 区域的后5%收入
-        self.high10_percent_incode = []  # 区域的前10%收入
+        self.low5_percent_income = []  # low 5% inocme
+        self.low10_percent_income = []  # low 10% income
+        self.high10_percent_incode = []  # top 0% income
         self.incomes = []
-        self.ave_house_price = 0  # 平均房价
-        self.ave_income = 0  # 平均收入
-        self.ave_wealth = 0  # 平均财富
-        self.ave_distance = 0  # 平均通勤距离
+        self.ave_house_price = 0  # mean house price
+        self.ave_income = 0  # mean income
+        self.ave_wealth = 0  # mean wealth
+        self.ave_distance = 0  # mean commuting distacne
 
-        self.labour_market = dict()  # 劳动力市场，key是job的id，value是job对象
+        self.labour_market = dict()  # labour market，key is job id，value is job object
         self.dynamic_welath = 0  # 每天增加的财富
 
         self.satisfaction_list = []
         self.round_num = 0
         pass
 
-    # 该函数只能由person和公司调用，用于每天给政府增加资产。每天迭代政府会处理该值
+    # this function only person and firm use to give asset to government
     def gain_wealth(self, money):
         self.dynamic_welath += money
 
@@ -453,7 +452,7 @@ class Area(Agent):
     def step(self):
         self.round_num += 1
         # print("area %d step.." % self.unique_id)
-        # 更新资产
+        # update assets
         self.wealth += self.dynamic_welath
         self.dynamic_welath = 0
 
@@ -468,10 +467,11 @@ class Area(Agent):
         self.low10_percent_income = model.get_low_npercent_list(self.incomes, 10)
         self.high10_percent_incode = model.get_top_npercent_list(self.incomes, 10)
 
-        # TODO 每天给未被雇佣者/未持有公司者发放随机10-20的资金,每发放10，此居民满意度+0.1
+        # TODO A random 10-20 fund is issued to unemployed/not holding companies every day.
+        #  For each 10, this resident satisfaction is +0.1.
         for p in list(self.people.values()):
             if p.job_state == JobState.Unemployment:
-                money = random.randrange(10, 20, 10)
+                money = random.randrange(10, 30, 10)#random.randrange(10, 30, 10)
                 p.wealth += money
                 p.satisfaction += (money / 10) * 0.1
 
@@ -483,7 +483,7 @@ class Area(Agent):
 class Firm(Agent):
     def __init__(self, model, fid, employee_num=0, xpoint=0, ypoint=0, satisfaction=0, wealth=0):
         super().__init__(model=model, unique_id=fid)
-        self.round_num = 0  # 记录是这个firm的第几次迭代，前N次迭代wealth只增不减
+        self.round_num = 0  # record this firm firm iteration，only plus before n iteration
         self.model = model
         self.unique_id = fid
         self.fid = fid  # uniqe id
@@ -492,18 +492,18 @@ class Firm(Agent):
         self.ypoint = ypoint
         self.satisfaction = satisfaction
         self.wealth = wealth
-        self.employees = dict()  # 员工列表. key是person的uinq id，value是person对象
+        self.employees = dict()  # staff list. key is person unique id，value is citizen object
 
-        self.area = None  # 属于哪个地区，不可能会变化
+        self.area = None  # belongs to which ward, immutable
 
-        self.dynamic_wealth = 0  # 每天增加的财富
-        self.boss = None  # 是否有boss
+        self.dynamic_wealth = 0  # change assets everyday
+        self.boss = None  # wethear boss
 
         self.satisfaction_list = []
 
         pass
 
-    # 该函数只能由其他角色调用，用于每天给公司增加资产。每天迭代会处理该值
+    # this function only citizens use to sonsum to firm
     def gain_wealth(self, money):
         self.dynamic_wealth += money
 
@@ -523,31 +523,32 @@ class Firm(Agent):
         for e, person in self.employees.items():
             total_wage_cost += self.employees[e].earning
             person.wealth += person.earning * (1 - configs.INCOME_TAX_RATE)
-        # 前N（30）轮只发工资，但是不扣除公司资产， 否则很快就破产了
+        # The first N (30) rounds are paid only, but the company's assets are not deducted,
+        # otherwise it will soon go bankrupt
         if self.model.step_num >= configs.FIRM_THRESHOLD:
             self.wealth -= total_wage_cost
-        if not self.area.tax_free_flag:  # 不免税的时候，政府收入要增加
+        if not self.area.tax_free_flag:
             self.area.gain_wealth(total_wage_cost * configs.INCOME_TAX_RATE)
             # self.wealth -= total_wage_cost * configs.HOUSE_RATE
             pass
 
-        # 房租
+        # rent
         self.pay_house_rent()
 
-        # 获得收入，是居民的消费行为，在居民行为里定义
+        # Income is the consumption behavior of the citizens and is defined in the behavior of citizens.
 
-        # 增加或者减少员工
+        # fire employee
         self.update_employee()
 
-        # 更新资产
+        # update assets
         self.wealth += self.dynamic_wealth
         self.dynamic_wealth = 0
         self.model.firm_wealth_record[self.unique_id] = self.wealth
 
-        # 投资房地产
+        # invest real estate
         self.invest_house()
 
-        # 检查是否破产
+        # check bankrupt
         self.bankrupt()
 
         self.collect_data()
@@ -572,9 +573,9 @@ class Firm(Agent):
         job.unique_id = self.model.next_id()
         job.firm = self
         job.area = job.firm.area
-        # 随机出岗位的教育水平
+        # random choice education level
         job.edu = random.choice([EduState.Low, EduState.Middle, EduState.High])
-        # 根据当地的人均收入，随机出岗位的薪酬。学历越高价格越高
+        # According to the mean income data, randomly assign the salary of the post.The higher the degree, the higher the price
         if not fixed:
             wage = self.area.ave_income
             if job.edu == EduState.High:
@@ -595,7 +596,7 @@ class Firm(Agent):
         if total_wage >= self.dynamic_wealth:
             self.satisfaction += 1
             self.add_job()
-        else:  # 减少一个岗位
+        else:  # reduce a post
             self.satisfaction -= 1
             p = random.choice(list(self.employees.values()))
             self.employees.pop(p.unique_id)
@@ -609,12 +610,12 @@ class Firm(Agent):
         old_wealth = self.wealth
         if self.wealth >= total_wage * 180 and self.wealth > 0:
             old_a = None
-            empty_loop1 = 0  # 防止无法退出
+            empty_loop1 = 0
             while empty_loop1 < 5:
                 a = self.model.get_top1_area()
                 if not a:
                     break
-                if old_a == a:  # 连续返回一个区域，说明可能没区域了
+                if old_a == a:
                     break
                 empty_loop1 += 1
                 old_a = a
@@ -622,11 +623,11 @@ class Firm(Agent):
                 if a.free_space > 0:
                     money = self.wealth - 180 * total_wage
                     space = money / self.area.ave_house_price / 85  #
-                    space = min(space, self.area.free_space / 20.0)  # 自己财富允许的量，和地区能卖给你的量
+                    space = min(space, self.area.free_space / 20.0)
                     # money = space * self.area.ave_house_price
-                    empty_loop = 0  # 防止最后切割房产的时候循环不结束
+                    empty_loop = 0
                     while space >= 0 and empty_loop < 15 and self.wealth > 0:
-                        hspace = random.uniform(42.5, 102)  # 房产分割为[42.5,102]平米
+                        hspace = random.uniform(42.5, 102)  # invest per house area range
                         if hspace >= space:
                             empty_loop += 1
                             continue
@@ -659,11 +660,11 @@ class Firm(Agent):
             # print("firm %d brankrupt, money %d" % (self.unique_id, self.wealth))
             # return
             # print()
-            # 删除所有员工。所有员工状态重置为失业
+            # Delete all employees. All employee status reset to unemployed
             es = list(self.employees.keys())
             for emplyee in es:
                 # self.model.a
-                self.employees[emplyee].job = JobState.Unemployment  # 失业
+                self.employees[emplyee].job = JobState.Unemployment  # unemployment
                 self.employees[emplyee].firm = None
                 self.employees.pop(emplyee)
             if self.unique_id not in self.model.firm_wealth_record:
@@ -673,5 +674,5 @@ class Firm(Agent):
                 self.boss.firm = None
             self.model.firm_wealth_record.pop(self.unique_id)
             self.area.firms.pop(self.unique_id)
-            self.model.schedule.remove(self)  # 从shedule中删除
+            self.model.schedule.remove(self)
             print("fid:%d die for bankrupt." % self.unique_id)

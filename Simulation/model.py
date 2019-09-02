@@ -48,8 +48,8 @@ class AreaPerson(Model):
 
         self.income_tax_rate = 0.10
         self.business_rate = 0.17
-        self.house_rate = 0.02  # 房地产购置税率
-        self.tax_begin_numer = 20  # 从第多少轮迭代起开始
+        self.house_rate = configs.HOUSE_RATE  # buy house tax
+        self.tax_begin_numer = 20  # Starting from the number of iterations
 
         self.schedule = RandomActivation(self)
         # self.datacollecto = DataCollector(agent_reporters={"satisfaction": lambda x: x.satisfaction})
@@ -58,78 +58,78 @@ class AreaPerson(Model):
         #     {"Wolves": lambda m: m.schedule.get_breed_count(Person),
         #      "Sheep": lambda m: m.schedule.get_breed_count(Sheep)})
 
-        # self.grid = GeoSpace(crs={"init": "epsg:3857"})  # 默认epsg:4326
+        # self.grid = GeoSpace(crs={"init": "epsg:3857"})  # epsg:4326
 
         # self.datacollector = DataCollector
 
         self.map_df = gpd.read_file(self.map_file)
 
         self.citizen_num = len(self.citizen_data)
-        self.firm_wealth_level = 1e12  # 所有公司资产的后5%，超过即可以创建公司
-        self.firm_wealth_record = dict()  # key是firm id， value是的firm的wealth
+        self.firm_wealth_level = 1e12  # all firms assets lowe 5%，if exceed they can run business
+        self.firm_wealth_record = dict()  # key is firm id， value is firm ealth
 
-        # self.aid_to_satisfaction = dict()  # key是area id， value是地区满意度
-        self.aid_to_area = dict()  # key是area id， value是area object
-        self.gsscode_to_aid = dict()  # key是gsscode，value是areaid
+        # self.aid_to_satisfaction = dict()  # key is area id， value ward satisfaction
+        self.aid_to_area = dict()  # key is area id， value is area object
+        self.gsscode_to_aid = dict()  # key is gsscode，value is areaid
 
         self.top1_area_list = []
 
-        self.house_market = dict()  # 代售的房产。 key是房子的id，object是房子对象
+        self.house_market = dict()  # Sale property。 key is house id，object is house object
 
         self.total_people_num = 0
         self.total_firm_num = 0
 
         start_time = datetime.datetime.now()
 
-        self.area_with_max_satisfaction = None  # 当前轮满意度最高的地区，出图用
+        self.area_with_max_satisfaction = None  # The area with the highest satisfaction of the current round, used for plotting
         self.area_with_max_avg_housePrice = None
-        # 初始化区域
-        # gird上面只放area，人和公司和某个area动态绑定
+        # initialize ward
+        # The gird only puts the area above, and the person and the company are dynamically bound to an area.
         # AC = AgentCreator(agent.Area)
         # areas = AC.from_GeoDataFrame(self.map_df)
         for i in range(self.citizen_num):
-            if self.flag_of_debug and i > 30:
+            if self.flag_of_debug and i > 100:
                 break
-            area_name = self.citizen_data['区名'][i]
-            area_code = self.citizen_data['区编号'][i]
+            area_name = self.citizen_data['Ward_Name'][i]
+            area_code = self.citizen_data['Ward_Code'][i]
             print("init: %d\t%s\t%s" % (i, area_name, area_code))
-            citizen = self.citizen_data[self.citizen_data['区编号'] == area_code].reset_index(drop=True)
-            firm = self.firm_data[self.firm_data['区编号'] == area_code].reset_index(drop=True)
+            citizen = self.citizen_data[self.citizen_data['Ward_Code'] == area_code].reset_index(drop=True)
+            firm = self.firm_data[self.firm_data['Ward_Code'] == area_code].reset_index(drop=True)
             ward = self.ward_data[self.ward_data['GSS_CODE'] == area_code].reset_index(drop=True)
             gdf = self.map_df[self.map_df['GSS_CODE'] == area_code].reset_index(drop=True)
             area = agent.Area(self, self.next_id())
             # 给area填充属性
             area.name = area_name
             area.code = area_code
-            area.firm_num = firm.loc[0, '小区公司数量']
-            area.employee_num = firm.loc[0, '员工数量']
+            area.firm_num = firm.loc[0, 'firm_count_Ward']
+            area.employee_num = firm.loc[0, 'post_count_Ward']
 
-            area.population = int(citizen.loc[0, '人口数量'])
-            area.earning = citizen.loc[0, '人均收入']
-            area.health = citizen.loc[0, '健康度']
-            area.satisfaction = citizen.loc[0, '满意度']
-            area.wealth = citizen.loc[0, '资产']
-            area.house_rate = citizen.loc[0, '自有房率']
-            area.rent_rate = citizen.loc[0, '租房率']
-            area.high_edu_rate = citizen.loc[0, '高教育占比'] / 100.0
-            area.middle_edu_rate = citizen.loc[0, '中教育占比'] / 100.0
-            area.low_edu_rate = citizen.loc[0, '低教育占比'] / 100.0
+            area.population = int(citizen.loc[0, 'population'])
+            area.earning = citizen.loc[0, 'mean_income']
+            area.health = citizen.loc[0, 'health']
+            area.satisfaction = citizen.loc[0, 'satisfaction']
+            area.wealth = citizen.loc[0, 'assets']
+            area.housing_rate = citizen.loc[0, 'own_house_rate']
+            area.rent_rate = citizen.loc[0, 'rent_rate']
+            area.high_edu_rate = citizen.loc[0, 'high_edu_rate'] / 100.0
+            area.middle_edu_rate = citizen.loc[0, 'middle_edu_rate'] / 100.0
+            area.low_edu_rate = citizen.loc[0, 'low_edu_rate'] / 100.0
 
-            area.total_space = ward.loc[0, '总面积/平米']
-            area.free_space = ward.loc[0, '空地比例'] * area.total_space
-            area.green_space = ward.loc[0, '绿地比例'] * area.total_space
-            area.building_space = ward.loc[0, '公共建筑比例'] * area.total_space
-            area.house_space = ward.loc[0, '住宅比例'] * area.total_space
+            area.total_space = ward.loc[0, 'total_space']
+            area.free_space = ward.loc[0, 'empty_space_rate'] * area.total_space
+            area.green_space = ward.loc[0, 'green_space_rate'] * area.total_space
+            area.building_space = ward.loc[0, 'public_building_space'] * area.total_space
+            area.house_space = ward.loc[0, 'residence_space_rate'] * area.total_space
 
             area.safety = ward.loc[0, 'nor_safety']
             area.railway = ward.loc[0, 'nor_railway']
 
-            # 年均收入乘以房价收入比=房屋总价，按照100平算计算一个
-            # area.ave_house_price = float(1 / 100.0 * ward.loc[0, '人均收入'] * \
+
+            # area.ave_house_price = float(1 / 100.0 * ward.loc[0, 'mean_income'] * \
             #                              random.uniform(configs.HOUSE_PRICE_TO_INCOME * 0.8,
             #                                             configs.HOUSE_PRICE_TO_INCOME * 1.2))
-            # 平均房价
-            area.ave_house_price = ward.loc[0, '平均房价']
+            # mean house price
+            area.ave_house_price = ward.loc[0, 'mean_house_price']
             # print("ave house price: %d" % area.ave_house_price)
 
             self.schedule.add(area)
@@ -137,7 +137,7 @@ class AreaPerson(Model):
             self.gsscode_to_aid[area_code] = area.unique_id
             # self.grid.add_agents(area)
 
-            # 根据区域的人口数量，放置若干个人。 人是动态的
+            # According to the population of ward, place citizen. citizens are dynamic
             for j in range(area.population):
                 # person_id = self.citizen_data['区编号'][i] + "_p_" + str(self.next_id())
                 x, y = self.get_one_position_by_area_code(area_code)
@@ -148,22 +148,21 @@ class AreaPerson(Model):
                                       ypoint=y,
                                       house=self.get_random_house(area_code))
                 if person.house_state == agent.HouseState.Yes:
-                    person.satisfaction += 5.0  # 有房产满意度增加
-                # 根据人均收入，随机出每个人的财富，人居收入*0.5~1.5倍
+                    person.satisfaction += 5.0  # + satisfaction, if citizen own house
+                # from mean income，random citizen assets(0.5-1.5)
                 person.wealth = random.uniform(0.50 * configs.WEALTH_TO_INCOME,
-                                               1.5 * configs.WEALTH_TO_INCOME) * ward.loc[0, '人均收入'] / 12.0
-                person.health = random.uniform(0.8, 1.0) * area.health  # 根据区域健康度随机健康
+                                               1.5 * configs.WEALTH_TO_INCOME) * ward.loc[0, 'mean_income'] / 12.0
+                person.health = random.uniform(0.9, 1.0) * area.health  # initial health
                 # TODO 优化是否有工作初始化逻辑
                 person.job_state = random.choice([agent.JobState.Employment, agent.JobState.Unemployment])
                 area.people[person.unique_id] = person
                 area.pid_to_income[person.unique_id] = person.earning
                 person.area = area
-                self.schedule.add(person)  # 参与调度但是不放在grid上
+                self.schedule.add(person)
 
-            # 根据区域的公司数量，放置若干个公司
-            # 人口数/50和人口数/20之间，随机一个数作为小区域公司数
+            # Place several companies based on the number of companies in the ward
             # firm_num = random.randint(area.population / 50, area.population / 20)
-            firm_num = int(firm.loc[0, '小区公司数量'])
+            firm_num = int(firm.loc[0, 'firm_count_Ward'])
 
             for j in range(firm_num):
                 x, y = self.get_one_position_by_area_code(area_code)
@@ -174,9 +173,9 @@ class AreaPerson(Model):
                 firm.area = area
                 area.firms[firm.unique_id] = firm
                 self.firm_wealth_record[firm.unique_id] = firm.wealth
-                self.schedule.add(firm)  # 参与调度但是不放在grid上
+                self.schedule.add(firm)
 
-            # 把每个person随机绑定到一个工作上
+            # people random match job
             if firm_num > 0:
                 firms = list(area.firms.values())
                 for p in list(area.people.values()):
@@ -199,9 +198,9 @@ class AreaPerson(Model):
         self.ward_data = pd.read_csv(self.ward_file)
 
     def get_random_edu(self, area_code):
-        d1 = self.citizen_data[self.citizen_data['区编号'] == area_code].reset_index(drop=True)
-        high_edu = d1.loc[0, '高教育占比']
-        low_edu = d1.loc[0, '低教育占比']
+        d1 = self.citizen_data[self.citizen_data['Ward_Code'] == area_code].reset_index(drop=True)
+        high_edu = d1.loc[0, 'high_edu_rate']
+        low_edu = d1.loc[0, 'low_edu_rate']
         random_number = 100 * random.random()
         if random_number < high_edu:
             return agent.EduState.High
@@ -211,15 +210,15 @@ class AreaPerson(Model):
             return agent.EduState.Middle
 
     def get_random_income(self, area_code):
-        d1 = self.citizen_data[self.citizen_data['区编号'] == area_code].reset_index(drop=True)
-        mu = d1.loc[0, '人均收入']
-        sigma2 = mu * 0.2  # 方差设为0.2倍的均值
+        d1 = self.citizen_data[self.citizen_data['Ward_Code'] == area_code].reset_index(drop=True)
+        mu = d1.loc[0, 'mean_income']
+        sigma2 = mu * 0.2  # The variance is set to 0.2 times the mean
         return np.random.normal(mu, sigma2, 1)[0]
 
     def get_random_house(self, area_code):
-        d1 = self.citizen_data[self.citizen_data['区编号'] == area_code].reset_index(drop=True)
+        d1 = self.citizen_data[self.citizen_data['Ward_Code'] == area_code].reset_index(drop=True)
         random_number = 100 * random.random()
-        if random_number < d1.loc[0, '自有房率']:
+        if random_number < d1.loc[0, 'own_house_rate']:
             return agent.HouseState.Yes
         else:
             return agent.HouseState.No
@@ -290,7 +289,7 @@ class AreaPerson(Model):
             if row['GSS_CODE'] in self.gsscode_to_aid:
                 aid = self.gsscode_to_aid[row['GSS_CODE']]
                 area = self.aid_to_area[aid]
-                val = area.ave_distance
+                val = area.satisfaction
             #else:
             #    val = random.uniform(0.0, 1.0)
             satisfaction.append(val)
@@ -298,7 +297,7 @@ class AreaPerson(Model):
         column_name = "manyidu_" + str(self.step_num)
         self.map_df.insert(2, column_name, satisfaction, True)
         fig, ax = plt.subplots(1, 1)
-        ax.set_title("Ward Mean Commute Distance after day %d " % self.step_num)
+        ax.set_title("Ward Satisfaction after day %d " % self.step_num)
         self.map_df.plot(figsize=(15,15), column=column_name, ax=ax, legend=True)
         plt.show()
         # print(self.map_df.head())
@@ -312,19 +311,39 @@ class AreaPerson(Model):
             if row['GSS_CODE'] in self.gsscode_to_aid:
                 aid = self.gsscode_to_aid[row['GSS_CODE']]
                 area = self.aid_to_area[aid]
-                val = area.firm_num
+                val = len(area.firms)
             # else:
             #    val = random.uniform(0.0, 1.0)
             firms.append(val)
         print("---->try to plot-------->")
-        column_name = "mean_commute_dist" + str(self.step_num)
+        column_name = "show_firms" + str(self.step_num)
         self.map_df.insert(2, column_name, firms, True)
         fig, ax = plt.subplots(1, 1)
         ax.set_title("Ward number of firms after day %d " % self.step_num)
-        self.map_df.plot(figsize=(15, 15), cmap='Oranges', column=column_name, ax=ax, edgecolor='black', legend=True)
+        self.map_df.plot(figsize=(15, 15), cmap='Oranges', column=column_name, ax=ax, legend=True)
         plt.show()
         # print(self.map_df.head())
         # self.map_df.geometry.plot(column='manyidu')
+
+    def show_assets(self):
+        #self.normalized()
+        assets = []
+        for _, row in self.map_df.iterrows():
+            val = 0
+            if row['GSS_CODE'] in self.gsscode_to_aid:
+                aid = self.gsscode_to_aid[row['GSS_CODE']]
+                area = self.aid_to_area[aid]
+                val = area.wealth
+            # else:
+            #    val = random.uniform(0.0, 1.0)
+            assets.append(val)
+        print("---->try to plot-------->")
+        column_name = "show_assets" + str(self.step_num)
+        self.map_df.insert(2, column_name, assets, True)
+        fig, ax = plt.subplots(1, 1)
+        ax.set_title("Ward mean assets after day %d " % self.step_num)
+        self.map_df.plot(figsize=(15, 15), cmap='Greens', column=column_name, ax=ax, legend=True)
+        plt.show()
 
     def show_citizen(self):
         # self.normalized()
@@ -339,11 +358,31 @@ class AreaPerson(Model):
             #    val = random.uniform(0.0, 1.0)
             population.append(val)
         print("---->try to plot-------->")
-        column_name = "mean_commute_dist" + str(self.step_num)
+        column_name = "population" + str(self.step_num)
         self.map_df.insert(2, column_name, population, True)
         fig, ax = plt.subplots(1, 1)
         ax.set_title("Ward number of citizens after day %d " % self.step_num)
-        self.map_df.plot(figsize=(15, 15), cmap='Reds', column=column_name, ax=ax, edgecolor='black', legend=True)
+        self.map_df.plot(figsize=(15, 15), cmap='Reds', column=column_name, ax=ax, legend=True)
+        plt.show()
+
+    def show_citizen_density(self):
+        #self.normalized()
+        citizen_density = []
+        for _, row in self.map_df.iterrows():
+            val = 0
+            if row['GSS_CODE'] in self.gsscode_to_aid:
+                aid = self.gsscode_to_aid[row['GSS_CODE']]
+                area = self.aid_to_area[aid]
+                val = len(area.population)/area.total_space
+            # else:
+            #    val = random.uniform(0.0, 1.0)
+            citizen_density.append(val)
+        print("---->try to plot-------->")
+        column_name = "show_citizen_density" + str(self.step_num)
+        self.map_df.insert(2, column_name, citizen_density, True)
+        fig, ax = plt.subplots(1, 1)
+        ax.set_title("citizen density after day %d " % self.step_num)
+        self.map_df.plot(figsize=(15, 15), cmap='Blues', column=column_name, ax=ax, legend=True)
         plt.show()
 
     def show_mean_house_price(self):
@@ -354,7 +393,7 @@ class AreaPerson(Model):
             if row['GSS_CODE'] in self.gsscode_to_aid:
                 aid = self.gsscode_to_aid[row['GSS_CODE']]
                 area = self.aid_to_area[aid]
-                val = area.ave_house_price
+                val = len(area.employee_num)
             # else:
             #    val = random.uniform(0.0, 1.0)
             mean_commute_dist.append(val)
@@ -362,7 +401,7 @@ class AreaPerson(Model):
         column_name = "mean_commute_dist" + str(self.step_num)
         self.map_df.insert(2, column_name, mean_commute_dist, True)
         fig, ax = plt.subplots(1, 1)
-        ax.set_title("Ward Mean House Price after day %d " % self.step_num)
+        ax.set_title("Ward employee_num after day %d " % self.step_num)
         self.map_df.plot(figsize=(15, 15), cmap='BuPu',column=column_name, ax=ax, edgecolor='black', legend=True)
         plt.show()
 
@@ -394,7 +433,7 @@ class AreaPerson(Model):
             if row['GSS_CODE'] in self.gsscode_to_aid:
                 aid = self.gsscode_to_aid[row['GSS_CODE']]
                 area = self.aid_to_area[aid]
-                val = area.building_space / area.total_space
+                val = area.total_space / area.building_space
             # else:
             #    val = random.uniform(0.0, 1.0)
             building_space.append(val)
@@ -414,7 +453,7 @@ class AreaPerson(Model):
             if row['GSS_CODE'] in self.gsscode_to_aid:
                 aid = self.gsscode_to_aid[row['GSS_CODE']]
                 area = self.aid_to_area[aid]
-                val = area.house_space / area.total_space
+                val = area.total_space / area.house_space
             # else:
             #    val = random.uniform(0.0, 1.0)
             house_space.append(val)
@@ -434,7 +473,7 @@ class AreaPerson(Model):
             if row['GSS_CODE'] in self.gsscode_to_aid:
                 aid = self.gsscode_to_aid[row['GSS_CODE']]
                 area = self.aid_to_area[aid]
-                val = area.free_space / area.total_space
+                val = area.total_space / area.free_space
             # else:
             #    val = random.uniform(0.0, 1.0)
             free_space.append(val)
@@ -446,18 +485,12 @@ class AreaPerson(Model):
         self.map_df.plot(figsize=(15, 15), cmap='PuBuGn', column=column_name, ax=ax, edgecolor='black', legend=True)
         plt.show()
 
-
-
-
-
-
-
     def show2(self):
         if not self.area_with_max_satisfaction:
             print("cannot show 2")
             return
         print("try to show2..... %d" % len(self.area_with_max_satisfaction.satisfaction_list))
-        aid_to_satisfaction = dict()  # key是area id， value是该地区满意度
+        aid_to_satisfaction = dict()  # key is area id， value ward satisfaction
         for aid, a in self.aid_to_area.items():
             if a.satisfaction > 0.0:
                 aid_to_satisfaction[aid] = a.satisfaction < 1.0
@@ -465,7 +498,7 @@ class AreaPerson(Model):
 
         df = dict()
         median_idx = int(len(aid_to_satisfaction)/2)
-        for aid, s in sorted(aid_to_satisfaction.items(), key=operator.itemgetter(1)):  # 按照满意度排序结果，得到的list不能再次排序
+        for aid, s in sorted(aid_to_satisfaction.items(), key=operator.itemgetter(1)):
             if idx < 5 or len(aid_to_satisfaction) - idx < 6:
                 df[self.aid_to_area[aid].name] = pd.Series(self.aid_to_area[aid].satisfaction_list)
             print("show2: %d %d"% (idx, len(aid_to_satisfaction)/2))
@@ -488,14 +521,14 @@ class AreaPerson(Model):
             print("cannot show 2")
             return
         print("try to show2..... %d" % len(self.area_with_max_satisfaction.satisfaction_list))
-        aid_to_assets = dict()  # key是area id， value是该地区满意度
+        aid_to_assets = dict()
         for aid, a in self.aid_to_area.items():
             aid_to_assets[aid] = a.ave_wealth < 1.0
         idx = 0
 
         df = dict()
         median_idx = int(len(aid_to_assets) / 2)
-        for aid, s in sorted(aid_to_assets.items(), key=operator.itemgetter(1)):  # 按照满意度排序结果，得到的list不能再次排序
+        for aid, s in sorted(aid_to_assets.items(), key=operator.itemgetter(1)):
             if idx < 5 or len(aid_to_assets) - idx < 6:
                 df[self.aid_to_area[aid].name] = pd.Series(self.aid_to_area[aid].satisfaction_list)
             print("show2: %d %d" % (idx, len(aid_to_assets) / 2))
@@ -518,14 +551,14 @@ class AreaPerson(Model):
             print("cannot show 3")
             return
         print("try to show3..... %d" % len(self.area_with_max_satisfaction.satisfaction_list))
-        aid_to_commute_line = dict()  # key是area id， value是该地区满意度
+        aid_to_commute_line = dict()
         for aid, a in self.aid_to_area.items():
             aid_to_commute_line[aid] = a.ave_distance < 1.0
         idx = 0
 
         df = dict()
         median_idx = int(len(aid_to_commute_line) / 2)
-        for aid, s in sorted(aid_to_commute_line.items(), key=operator.itemgetter(1)):  # 按照满意度排序结果，得到的list不能再次排序
+        for aid, s in sorted(aid_to_commute_line.items(), key=operator.itemgetter(1)):
             if idx < 5 or len(aid_to_commute_line) - idx < 6:
                 df[self.aid_to_area[aid].name] = pd.Series(self.aid_to_area[aid].satisfaction_list)
             print("show2: %d %d" % (idx, len(aid_to_commute_line) / 2))
@@ -548,14 +581,14 @@ class AreaPerson(Model):
             print("cannot show 3")
             return
         print("try to show3..... %d" % len(self.area_with_max_satisfaction.satisfaction_list))
-        aid_to_public_space = dict()  # key是area id， value是该地区满意度
+        aid_to_public_space = dict()  # key is area id， value ward satisfaction
         for aid, a in self.aid_to_area.items():
             aid_to_public_space[aid] = a.building_space < 1.0
         idx = 0
 
         df = dict()
         median_idx = int(len(aid_to_public_space) / 2)
-        for aid, s in sorted(aid_to_public_space.items(), key=operator.itemgetter(1)):  # 按照满意度排序结果，得到的list不能再次排序
+        for aid, s in sorted(aid_to_public_space.items(), key=operator.itemgetter(1)):  # Sort the results according to satisfaction, the list can not be sorted again
             if idx < 5 or len(aid_to_public_space) - idx < 6:
                 df[self.aid_to_area[aid].name] = pd.Series(self.aid_to_area[aid].satisfaction_list)
             print("show2: %d %d" % (idx, len(aid_to_public_space) / 2))
@@ -573,9 +606,6 @@ class AreaPerson(Model):
         plt.subplots_adjust(wspace=2)
         plt.show()
 
-
-    # 归一化。取所有地区中得分最高的，定义为1，其他根据比例折算得分
-    # 归一化区域
     # TODO
     def normalized(self):
         mx = -99999999
@@ -587,13 +617,13 @@ class AreaPerson(Model):
             total_income = 0
             total_wealth = 0
             a.population = len(a.people)
-            if not a.population:  # 可怕，这个区域人都挂了
+            if not a.population:  # Terrible, people in this area are dead.
                 a.satisfaction = 0
                 if a.satisfaction > 0:
                     mx = a.satisfaction
                 continue
-            dis_num = 0  # 需要通勤的人数
-            total_distance = 0  # 总的通勤距离
+            dis_num = 0  # total commuting citizens
+            total_distance = 0  # total commuting distance
             for _, p in a.people.items():
                 if p.job_state == agent.JobState.Employment:
                     total_income += p.earning
@@ -609,19 +639,19 @@ class AreaPerson(Model):
             a.ave_wealth = total_wealth * 1.0 / a.population
             a.safety = a.safety
             a.railway = a.railway
-            a.ave_distance = total_distance / max(1, dis_num)  # 防止除以0
-            a.cscore = a.ave_income * 1.5
-            a.cscore += a.ave_wealth * 2
-            a.cscore += a.green_space * 150 / a.total_space  # 绿地比例小于1，得乘一较大的数，不然对总分没影响
+            a.ave_distance = total_distance / max(1.0, dis_num)  # avoid divide 0
+            a.cscore = a.ave_income * 1
+            a.cscore += a.ave_wealth * 0.01
+            a.cscore += a.green_space * 100 / a.total_space
             a.cscore += a.building_space * 100 / a.total_space
-            a.cscore += a.safety * 1.0
-            a.cscore += a.railway * 1.5
-            if a.cscore > a.ave_distance * 1.5:
-                a.cscore -= (1.5 * a.ave_distance)
+            a.cscore += a.safety * 100
+            a.cscore += a.railway * 100
+            if a.cscore > a.ave_distance * 50:
+                a.cscore -= (50 * a.ave_distance)
             if a.cscore > mx:
                 mx = a.cscore
                 self.area_with_max_satisfaction = a
-        mx = max(1.0, mx)  # 防止除以0
+        mx = max(1.0, mx)  # avoid divide 0
         for _, a in self.aid_to_area.items():
             a.satisfaction = a.cscore / mx
             a.collect_data()
@@ -635,27 +665,27 @@ class AreaPerson(Model):
                                                       self.total_people_num))
         self.normalized()
         all_wealth = list(self.firm_wealth_record.values())
-        all_wealth.sort()  # 排序
+        all_wealth.sort()  # sort
         try:
             self.firm_wealth_level = get_low_npercent_list(all_wealth, 5)[-1]  # 后5%
         except:
             print("heheh")
 
-        aid_to_satisfaction = dict()  # key是area id， value是该地区满意度
+        aid_to_satisfaction = dict()  # key is area id， value ward satisfaction
         for aid, a in self.aid_to_area.items():
             aid_to_satisfaction[aid] = a.satisfaction
 
-        # 更新满意度前百分之一区域
+        # Update top one percent before the satisfaction of ward
         self.top1_area_list = []
 
         aids_sort_by_satisfaction = []
-        for aid, s in sorted(aid_to_satisfaction.items(), key=operator.itemgetter(1)):  # 按照满意度排序结果，得到的list不能再次排序
+        for aid, s in sorted(aid_to_satisfaction.items(), key=operator.itemgetter(1)):  # Sort the results according to satisfaction, the list can not be sorted again
             aids_sort_by_satisfaction.append(aid)
 
-        self.top1_area_list = get_top_npercent_list(aids_sort_by_satisfaction, 1)  # 满意度前1%
-        low_10_area = get_low_npercent_list(aids_sort_by_satisfaction, 10)  # 后10%
-        low_5_area = get_low_npercent_list(aids_sort_by_satisfaction, 5)  # 后5%
-        low_1_area = get_low_npercent_list(aids_sort_by_satisfaction, 1)  # 后1%
+        self.top1_area_list = get_top_npercent_list(aids_sort_by_satisfaction, 1)  # satisfaction top 1%
+        low_10_area = get_low_npercent_list(aids_sort_by_satisfaction, 10)  # low 10%
+        low_5_area = get_low_npercent_list(aids_sort_by_satisfaction, 5)  # low 5%
+        low_1_area = get_low_npercent_list(aids_sort_by_satisfaction, 1)  # low 1%
 
         area = self.aid_to_area[self.random.choice(low_5_area)]
         all_firms = list(area.firms.values())
@@ -665,20 +695,18 @@ class AreaPerson(Model):
 
         for a in list(self.aid_to_area.values()):
             a.tax_free_flag = False
-        # 每天更新选择公式满意度后1%的区域个区域，免除消费税(不包括房产交易税
+        # Update and select 1% of ward after company satisfaction,
+        # exempt from consumption tax (excluding real estate transaction tax)
         self.aid_to_area[random.choice(low_1_area)].tax_free_flag = True
 
-        # 随意选一个满意度低于5%的地区增加一个岗位
-        # 增加岗位的话，随机选中一个区域，在这个区域里随机选中一个公司，给这个公司增加岗位
-        # 如果这个区域没有公司，则增加岗位失败。此时就要再选。
-        # 最多选五次，如果岗位还是没有增加成功，就不再增加了
+        # Random choose a ward with a satisfaction below 5% to add a post
         try_times = 0
         while try_times < 5:
             if self.add_job(self.aid_to_area[random.choice(low_5_area)]):
                 break
             try_times += 1
 
-        # 投资公共设施。逻辑和增加岗位一样。最多尝试五次，依然失败则放弃
+        # invest public facilities
         try_times = 0
         while try_times < 5:
             if self.invest_service(self.aid_to_area[random.choice(low_10_area)]):
@@ -695,22 +723,37 @@ class AreaPerson(Model):
             end_time = datetime.datetime.now()
             time_cost = end_time - start_time
             print("in round %d, time cost: %s" % (i + 1, str(time_cost).split('.')[0]))
-            # for j in range(0,configs.MAX_DAYS,30):
-            #     if i == j*3 - 3:
-            #         self.show_firms()
-            #     if i == j*3 - 2:
-            #         self.show_citizen()
-            #     if i == j*3 - 1:
-            #         self.show_mean_house_price()
-            #     if i == j*3:
-            #         self.show_income()
-            #     if i == j*3  + 1:
-            #         self.show_building_space()
-            #     if i == j*3  + 2:
-            #         self.show_house_space()
-            #     if i == j*3  + 3:
-            #         self.show_free_space()
-            #
+            for j in range(0,configs.MAX_DAYS,30):
+
+
+                if i == j*3 - 1:
+                    self.show1()
+                # if i == j*3:
+                #     self.show_firms()
+                # if i == j*3 + 1:
+                #     self.show_citizen()
+                # if i == j*3:
+                #     self.show_income()
+                # if i == j*3  + 1:
+                #     self.show_building_space()
+                # if i == j*3  + 2:
+                #     self.show_house_space()
+                # if i == j*3  + 3:
+                #     self.show_free_space()
+            #            if i == 30
+            if i == 0:
+                self.show1()
+            # if i == 1:
+            #     self.show_firms()
+            # if i == 2:
+            #     self.show_citizen()
+            if i == 29:
+                self.show1()
+            # if i == 30:
+            #     self.show_firms()
+            # if i == 31:
+            #     self.show_citizen()
+
             # if i == 30 - 3:
             #     self.show_firms()
             # if i == 30 - 2:
@@ -744,20 +787,20 @@ class AreaPerson(Model):
             # if i == 1081:
             #     self.show_satisfaction()
 
-            if i == 181:
-                self.show_public_space()
-            if i == 361:
-                self.show_public_space()
-            if i == 721:
-                self.show_public_space()
-            if i == 1081:
-                self.show_public_space()
+            # if i == 181:
+            #     self.show_public_space()
+            # if i == 361:
+            #     self.show_public_space()
+            # if i == 721:
+            #     self.show_public_space()
+            # if i == 1081:
+            #     self.show_public_space()
             # if i ==1801:
             #     self.commute_line()
         #self.show1()
-        # 打印满意度top5+median+low5地区的满意度走势
+        #Print Satisfaction trend of top5+median+low5 ward
         #self.show3()
 
-        # 显示最高满意度地区，满意度居中的person/firm的满意度走势图
-        #agent.plot_area(self.area_with_max_satisfaction)  # 默认是person
-        #agent.plot_area(self.area_with_max_satisfaction, type="firm")  # 绘制firm
+
+        #agent.plot_area(self.area_with_max_satisfaction)  # default is person
+        #agent.plot_area(self.area_with_max_satisfaction, type="firm")  # draw firm
