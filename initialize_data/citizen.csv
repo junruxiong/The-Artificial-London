@@ -1,4 +1,4 @@
-﻿区编号,区名,人口数量,高教育占比,中教育占比,低教育占比,人均收入,健康度,雇佣情况,X,Y,满意度,舒适度,资产,自有房率,租房率,平均房价
+﻿Ward_Code,Ward_Name,population,high_edu_rate,middle_edu_rate,low_edu_rate,mean_income,health,employemnt_state,X,Y,satisfaction,comfort,assets,own_house_rate,rent_rate,mean_house_price
 E09000001,City of London,74,68.4,24.9,6.7,72392.86292,1,0,,,0,0,0,0.425997719,0.574002281,559837
 E05000026,Abbey,129,34.5,49.1,16.4,13948.86159,1,0,,,0,0,0,0.337926509,0.662073491,172656
 E05000027,Alibon,105,16.7,52.1,31.2,14023.02732,1,0,,,0,0,0,0.465625787,0.534374213,162656

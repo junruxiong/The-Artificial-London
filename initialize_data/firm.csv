@@ -1,4 +1,4 @@
-﻿区编号,区名,大区名,大区公司数量,小区公司数量,职位数量,员工数量,X,Y,满意度,资产
+﻿Ward_Code,Ward_Name,Borough_Name,firm_count_Borough,firm_count_Ward,post_count_Ward,employee_count,X,Y,satisfaction,assets
 E09000001,City of London,City of London,133,133,3741,,,,0,0
 E05000026,Abbey,Barking and Dagenham,32,5,79,,,,0,0
 E05000027,Alibon,Barking and Dagenham,,1,8,,,,0,0
