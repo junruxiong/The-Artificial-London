@@ -10,3 +10,6 @@ to run this programme:
 install mesa
 
 install geopandas
+
+
+paper Link: https://1drv.ms/b/s!AmmZhGN3gR5khD9F9VGUR1_iBc3i?e=PHWm8U
